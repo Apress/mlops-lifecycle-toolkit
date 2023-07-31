@@ -1,0 +1,5 @@
+{
+    "directory_name": "Welcome to the MLOps toolkit accelerator, please enter name of your project example fake_corp_toolkit",
+    "file_name": "main_orchestrator.py",
+    "greeting_recipient": "<Your name>"
+}

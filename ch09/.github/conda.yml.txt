@@ -1,0 +1,60 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Set up Python environment
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - name: Install pipenv
+      run: pip install pipenv
+    - name: Install dependencies
+      run: |
+        pipenv install --dev
+        pipenv lock --requirements > requirements.txt
+    - name: Convert notebooks to Python scripts
+      uses: jupyter/nbconvert-action@v1
+      with:
+        format: script
+        notebooks: |
+          notebooks/*.ipynb
+    - name: Run Pytest
+      run: pipenv run pytest
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        push: true
+        tags: registry.example.com/username/repository:latest
+        builder: mybuilder
+      env:
+        DOCKER_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+        DOCKER_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        DOCKER_REGISTRY: registry.example.com
+        DOCKER_BUILDKIT: 1
+        DOCKER_BUILDKIT_INLINE_CACHE: 1
+        DOCKER_BUILD_ARGS: --progress=plain
+    - name: Set up Kubeflow CLI
+      uses: kedacore/actions/keda@v1
+      with:
+        version: "1.6.0"
+    - name: Install Kubeflow CLI
+      run: |
+        kfctl build -V 1.6.0
+        sudo mv kfctl /usr/local/bin
+    - name: Create Kubeflow namespace
+      run: kubectl create namespace kubeflow
+    - name: Deploy Kubeflow application
+      run: |
+        kfctl apply -f kfctl_k8s_istio.v1.6.0.yaml
+        kubectl wait --for=condition=Available deployment --all --timeout=300s -n kubeflow

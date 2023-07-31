@@ -1,0 +1,46 @@
+import pandas as pd
+import numpy as np
+from sklearn.linear_model import LogisticRegression
+import shap
+
+# Generate mock dataset
+n = 1000
+X = pd.DataFrame({
+    'Age': np.random.randint(18, 90, size=n),
+    'SocioEconomicClass_Upper': np.random.choice([0, 1], size=n, p=[0.7, 0.3]),
+    'SocioEconomicClass_Middle': np.random.choice([0, 1], size=n, p=[0.4, 0.6]),
+    'SocioEconomicClass_Lower': np.random.choice([0, 1], size=n, p=[0.2, 0.8]),
+})
+y = np.random.choice([0, 1], size=n, p=[0.6, 0.4])
+
+# Split into train and test sets
+split_ratio = 0.7
+split_index = int(n * split_ratio)
+X_train, X_test = X.iloc[:split_index], X.iloc[split_index:]
+y_train, y_test = y[:split_index], y[split_index:]
+
+# Train logistic regression model
+model = LogisticRegression(random_state=42)
+model.fit(X_train, y_train)
+
+# Calculate SHAP values for test set
+explainer = shap.LinearExplainer(model, X_train)
+shap_values = explainer.shap_values(X_test)
+
+# Calculate demographic parity by socioeconomic class
+upper_class_shap_values = shap_values[X_test['SocioEconomicClass_Upper'] == 1]
+middle_class_shap_values = shap_values[X_test['SocioEconomicClass_Middle'] == 1]
+lower_class_shap_values = shap_values[X_test['SocioEconomicClass_Lower'] == 1]
+
+# Calculate mean absolute SHAP values for each class
+upper_class_mean_shap = np.mean(np.abs(upper_class_shap_values))
+middle_class_mean_shap = np.mean(np.abs(middle_class_shap_values))
+lower_class_mean_shap = np.mean(np.abs(lower_class_shap_values))
+
+# Calculate demographic parity difference
+dp_diff = np.abs(upper_class_mean_shap - lower_class_mean_shap)
+
+print("Demographic parity difference:", dp_diff)
+
+
+
